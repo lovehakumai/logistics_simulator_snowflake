@@ -2,9 +2,9 @@ from snowflake.snowpark.context import get_active_session
 import streamlit as st 
 import pandas as pd 
 from components.setup.form_template import form_template
+from components.setup.form_countries import form_countries
 from class.setup_data import Setup_data
 from class.setup_state import Setup_state
-from components.setup.form_countries import form_countries
 
 def setup():
     setup_data = Setup_data()

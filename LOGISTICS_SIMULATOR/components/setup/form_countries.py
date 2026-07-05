@@ -1,6 +1,6 @@
 import streamlit as st
-from setup.setup_state import Setup_state
-from setup.setup_data import Setup_data
+from classes.setup.setup_state import Setup_state
+from classes.setup.setup_data import Setup_data
 def form_countries(setup_state: Setup_state, setup_data: Setup_data, country):
     with st.form("f_countries"):
         col1, col2 = st.columns(2)
