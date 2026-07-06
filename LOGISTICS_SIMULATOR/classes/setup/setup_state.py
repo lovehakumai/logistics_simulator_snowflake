@@ -6,10 +6,6 @@ class Setup_state:
             "origin_country" : "USA", 
             "destination_country" : "KOREA", 
             "air_distance": '',
-            "f_countries": False,
-            "f_ports": False,
-            "f_bases": False,
-            'f_vehicles': False,
             "status_f_countries": False,
             "status_f_air_base": False,
             "status_f_air_port": False,
@@ -44,7 +40,6 @@ class Setup_state:
         widget_key = 'status' + '_' + key_name
         st.session_state[widget_key] = True
 
-    @property 
     def get_value(self, key_name):
         if key_name in st.session_state:
             return st.session_state[key_name]

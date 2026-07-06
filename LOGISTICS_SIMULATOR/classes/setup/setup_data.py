@@ -1,17 +1,16 @@
 from snowflake.snowpark.context import get_active_session
 import pandas as pd 
-from class.setup.setup_state import setup_state
 
 class Setup_data():
 
     def __init__(self):
         self.session = get_active_session()
         self.mode_dim = 'DEV_ANALYTICS.MRT__DIM_MODE_FACTOR'
-        self.counrty_dim = 'DEV_ANALYTICS.MRT__DIM_COUNTRY_FACTOR'
+        self.country_dim = 'DEV_ANALYTICS.MRT__DIM_COUNTRY_FACTOR'
         
-        session.sql("USE DATABASE KAGGLE_LOGISTICS").collect()    
-        self.mode_dim = session.sql(f"SELECT * FROM {mode_dim}").to_pandas()
-        self.country_dim = session.sql(f"SELECT * FROM {country_dim}").to_pandas()
+        self.session.sql("USE DATABASE KAGGLE_LOGISTICS").collect()    
+        self.mode_dim = self.session.sql(f"SELECT * FROM {self.mode_dim}").to_pandas()
+        self.country_dim = self.session.sql(f"SELECT * FROM {self.country_dim}").to_pandas()
 
         self.air_vehicle = None 
         self.air_fuel = None 
@@ -27,21 +26,31 @@ class Setup_data():
         self.rail_vehicle = None 
         self.rail_fuel = None 
 
+        self.air_list_base = None 
+        self.sea_list_base = None 
+        self.road_list_base = None 
+        self.rail_list_base = None
+
+        self.air_list_port = None 
+        self.sea_list_port = None 
+        self.road_list_port = None 
+        self.rail_list_port = None 
+
     def get_base_point(self, country_name):
-        df = country_dim[country_dim['COUNTRY_NAME'] == country_name]
-        air_list = df[df["TRANSPORT_MODE"] == 'AIR']['BASE_POINT'].unique()
-        sea_list = df[df["TRANSPORT_MODE"] == 'SEA']['BASE_POINT'].unique()
-        road_list = df[df["TRANSPORT_MODE"] == 'ROAD']['BASE_POINT'].unique()
-        rail_list = df[df["TRANSPORT_MODE"] == 'RAIL']['BASE_POINT'].unique()
-        return {"AIR":air_list, "SEA":sea_list, "ROAD":road_list, "RAIL":rail_list}
+        df = self.country_dim[self.country_dim['COUNTRY_NAME'] == country_name]
+        air_list_base = df[df["TRANSPORT_MODE"] == 'AIR']['BASE_POINT'].unique()
+        sea_list_base = df[df["TRANSPORT_MODE"] == 'SEA']['BASE_POINT'].unique()
+        road_list_base = df[df["TRANSPORT_MODE"] == 'ROAD']['BASE_POINT'].unique()
+        rail_list_base = df[df["TRANSPORT_MODE"] == 'RAIL']['BASE_POINT'].unique()
+        return {"AIR":air_list_base, "SEA":sea_list_base, "ROAD":road_list_base, "RAIL":rail_list_base}
 
     def get_port_name(self, base_name):
-        df = country_dim[(country_dim['BASE_POINT'] == base_name)]
-        air_list = df[df["TRANSPORT_MODE"] == 'AIR']['PORT_NAME_RN'].unique()
-        sea_list = df[df["TRANSPORT_MODE"] == 'SEA']['PORT_NAME_RN'].unique()
-        road_list = df[df["TRANSPORT_MODE"] == 'ROAD']['PORT_NAME_RN'].unique()
-        rail_list = df[df["TRANSPORT_MODE"] == 'RAIL']['PORT_NAME_RN'].unique()
-        return {"AIR":air_list, "SEA":sea_list, "ROAD":road_list, "RAIL":rail_list}
+        df = self.country_dim[self.country_dim['BASE_POINT'] == base_name]
+        air_list_port = df[df["TRANSPORT_MODE"] == 'AIR']['PORT_NAME_EN'].unique()
+        sea_list_port = df[df["TRANSPORT_MODE"] == 'SEA']['PORT_NAME_EN'].unique()
+        road_list_port = df[df["TRANSPORT_MODE"] == 'ROAD']['PORT_NAME_EN'].unique()
+        rail_list_port = df[df["TRANSPORT_MODE"] == 'RAIL']['PORT_NAME_EN'].unique()
+        return {"AIR":air_list_port, "SEA":sea_list_port, "ROAD":road_list_port, "RAIL":rail_list_port}
         return result_list
 
     def update_air_params(self):

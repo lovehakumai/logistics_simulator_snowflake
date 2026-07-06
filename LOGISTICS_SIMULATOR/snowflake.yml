@@ -7,3 +7,12 @@ entities:
       - pyproject.toml
       - streamlit_app.py
       - .streamlit/config.toml
+    identifier:
+      database: KAGGLE_LOGISTICS
+      schema: DEV_ANALYTICS
+      name: LOGISTICS_SIMULATOR
+    title: LOGISTICS_SIMULATOR
+    query_warehouse: COMPUTE_WH
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
+    run_mode: SpcsOnly
+    execute_as: OWNER

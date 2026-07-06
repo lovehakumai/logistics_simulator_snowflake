@@ -13,25 +13,28 @@ def form_template(setup_state:Setup_state, setup_data:Setup_data, transport_mode
     else:
         st.write('BASE POINT')
         
-        origin_base_dict = setup_data.get_base_point(setup_state.get_value('origin_country'))
-        destination_base_dict = setup_data.get_base_point(setup_state.get_value('destination_country'))
+        st.session_state[f'_{transport_mode_low}_origin_base_dict'] = setup_data.get_base_point(setup_state.get_value('origin_country'))
+        st.session_state[f'_{transport_mode_low}_destination_base_dict'] = setup_data.get_base_point(setup_state.get_value('destination_country'))
+        setup_state.store_value(f'{transport_mode_low}_origin_base_dict')
+        setup_state.store_value(f'{transport_mode_low}_destination_base_dict')
         
-        with st.form(f'f_{transport_mode_low}_base'):
+        with st.form(f'form_{transport_mode_low}_base'):
             col1, col2 = st.columns(2)
             with col1:
-                st.selectbox("ORIGIN", origin_base_dict[transport_mode_up], key=f'_{transport_mode_low}_origin_base')
+                st.selectbox("ORIGIN", st.session_state[f'{transport_mode_low}_origin_base_dict'][transport_mode_up], key=f'_{transport_mode_low}_origin_base')
             with col2:
-                st.selectbox("DESTINATION", destination_base_dict[transport_mode_up], key=f'_{transport_mode_low}_dist_base')
+                st.selectbox("DESTINATION", st.session_state[f'{transport_mode_low}_destination_base_dict'][transport_mode_up], key=f'_{transport_mode_low}_dest_base')
             st.form_submit_button("submit", key=f"f_{transport_mode_low}_base", on_click=setup_state.store_status_value, args=[f'f_{transport_mode_low}_base'])
             
         if st.session_state[f'f_{transport_mode_low}_base']:
             setup_state.store_value(f'{transport_mode_low}_origin_base')
-            setup_state.store_value(f'{transport_mode_low}_dist_base')
+            setup_state.store_value(f'{transport_mode_low}_dest_base')
             
-            st.session_state[f'_{transport_mode_low}_origin_port_list'] = setup_data.get_port_name(setup_state.get(f'{transport_mode_low}_origin_base'))
+            st.session_state[f'_{transport_mode_low}_origin_port_list'] = setup_data.get_port_name(setup_state.get_value(f'{transport_mode_low}_origin_base'))
             setup_state.store_value(f'{transport_mode_low}_origin_port_list')
-            st.session_state[f'_{transport_mode_low}_destination_port_list'] = setup_data.get_port_name(setup_state.get(f'{transport_mode_low}_dest_base'))
+            st.session_state[f'_{transport_mode_low}_destination_port_list'] = setup_data.get_port_name(setup_state.get_value(f'{transport_mode_low}_dest_base'))
             setup_state.store_value(f'{transport_mode_low}_destination_port_list')
+
 # ========================================================================================================
 # Ports
 # ========================================================================================================
@@ -42,16 +45,16 @@ def form_template(setup_state:Setup_state, setup_data:Setup_data, transport_mode
             destination_port = setup_state.get_value(f'{transport_mode_low}_destination_port_list')
 
             st.write('PORTS')
-            with st.form(f'f_{transport_mode_low}_port'):
+            with st.form(f'form_{transport_mode_low}_port'):
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.selectbox("ORIGIN", origin_port, key=f'_{transport_mode_low}_origin_port')
+                    st.selectbox("ORIGIN", origin_port[transport_mode_up], key=f'_{transport_mode_low}_origin_port')
                 with col2:
-                    st.selectbox("DESTINATION", destination_port, key=f'_{transport_mode_low}_dist_port')
+                    st.selectbox("DESTINATION", destination_port[transport_mode_up], key=f'_{transport_mode_low}_dest_port')
                 st.form_submit_button("submit", key=f"f_{transport_mode_low}_port", on_click=setup_state.store_status_value, args=[f'f_{transport_mode_low}_port'])
             if st.session_state[f'f_{transport_mode_low}_port']:
                 setup_state.store_value(f'{transport_mode_low}_origin_port')
-                setup_state.store_value(f'{transport_mode_low}_dist_port')
+                setup_state.store_value(f'{transport_mode_low}_dest_port')
 # ========================================================================================================
 # Vehicle Params
 # ========================================================================================================
@@ -64,7 +67,7 @@ def form_template(setup_state:Setup_state, setup_data:Setup_data, transport_mode
                 # ---------------------------------------------------------------------------------------
                 if transport_mode_low == 'air':
                     setup_data.update_air_params()
-                    with st.form(f'f_{transport_mode_low}_vehicle'):
+                    with st.form(f'form_{transport_mode_low}_vehicle'):
                         st.selectbox("DISTANCE", setup_data.air_distance, key='_air_distance')
                         st.selectbox("VEHICLE_TYPE", setup_data.air_vehicle, key='_air_vehicle_type')
                         st.selectbox("FUEL_TYPE", setup_data.air_fuel, key='_air_fuel_type')
@@ -78,7 +81,7 @@ def form_template(setup_state:Setup_state, setup_data:Setup_data, transport_mode
                 # ---------------------------------------------------------------------------------------
                 elif transport_mode_low == 'sea':
                     setup_data.update_sea_params()
-                    with st.form('f_sea_vehicle'):
+                    with st.form('form_sea_vehicle'):
                         st.selectbox("SIZE", setup_data.sea_size, key='_sea_size')
                         st.selectbox("VEHICLE_TYPE", setup_data.sea_vehicle, key='_sea_vehicle_type')
                         st.selectbox("FUEL_TYPE", setup_data.sea_fuel, key='_sea_fuel_type')
@@ -92,7 +95,7 @@ def form_template(setup_state:Setup_state, setup_data:Setup_data, transport_mode
                 # ---------------------------------------------------------------------------------------
                 elif transport_mode_low == 'road':
                     setup_data.update_road_params()
-                    with st.form('f_road_vehicle'):
+                    with st.form('form_road_vehicle'):
                         st.selectbox("VEHICLE_TYPE", setup_data.road_vehicle, key='_road_vehicle_type')
                         st.selectbox("FUEL_TYPE", setup_data.road_fuel,  key='_road_fuel_type')
                         st.form_submit_button("submit", key="f_road_vehicle", on_click=setup_state.store_status_value, args=['f_road_vehicle'])
@@ -104,7 +107,7 @@ def form_template(setup_state:Setup_state, setup_data:Setup_data, transport_mode
                 # ---------------------------------------------------------------------------------------
                 elif transport_mode_low == 'rail':
                     setup_data.update_rail_params()
-                    with st.form('f_rail_vehicle'):
+                    with st.form('form_rail_vehicle'):
                         st.selectbox("VEHICLE_TYPE", setup_data.rail_vehicle, key='_rail_vehicle_type')
                         st.selectbox("FUEL_TYPE", setup_data.rail_fuel,  key='_rail_fuel_type')
                         st.form_submit_button("submit", key="f_rail_vehicle", on_click=setup_state.store_status_value, args=['f_rail_vehicle'])
