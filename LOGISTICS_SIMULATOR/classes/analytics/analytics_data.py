@@ -7,6 +7,7 @@ import math
 class Analytics_data:
     def __init__(self):
         self.session = get_active_session()
+        self.session.sql("ALTER SESSION SET QUERY_TAG = 'mrr_leakage_audit_app'").collect()
         self.mode_dim_table = 'DEV_ANALYTICS.MRT__DIM_MODE_FACTOR'
         self.country_dim_table = 'DEV_ANALYTICS.MRT__DIM_COUNTRY_FACTOR'
         self.fct_fuel_price_table = 'DEV_INTERMEDIATE.INT__FCT_AGG_FUEL_PRICE'

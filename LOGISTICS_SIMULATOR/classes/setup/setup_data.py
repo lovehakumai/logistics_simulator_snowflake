@@ -5,6 +5,7 @@ class Setup_data():
 
     def __init__(self):
         self.session = get_active_session()
+        self.session.sql("ALTER SESSION SET QUERY_TAG = 'mrr_leakage_audit_app'").collect()
         self.mode_dim = 'DEV_ANALYTICS.MRT__DIM_MODE_FACTOR'
         self.country_dim = 'DEV_ANALYTICS.MRT__DIM_COUNTRY_FACTOR'
         
