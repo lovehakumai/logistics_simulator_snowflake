@@ -7,18 +7,25 @@ import math
 class Analytics_data:
     def __init__(self):
         self.session = get_active_session()
-        self.mode_dim = 'DEV_ANALYTICS.MRT__DIM_MODE_FACTOR'
-        self.country_dim = 'DEV_ANALYTICS.MRT__DIM_COUNTRY_FACTOR'
+        self.mode_dim_table = 'DEV_ANALYTICS.MRT__DIM_MODE_FACTOR'
+        self.country_dim_table = 'DEV_ANALYTICS.MRT__DIM_COUNTRY_FACTOR'
+        self.fct_fuel_price_table = 'DEV_INTERMEDIATE.INT__FCT_AGG_FUEL_PRICE'
+        self.fct_risk_table = 'DEV_INTERMEDIATE.INT__FCT_DEST_AGG'
+        self.fct_agg_logs = 'DEV_INTERMEDIATE.INT__FCT_AGG_LOGS'
         
         self.session.sql("USE DATABASE KAGGLE_LOGISTICS").collect()    
-        self.mode_dim = self.session.sql(f"SELECT * FROM {self.mode_dim}").to_pandas()
-        self.country_dim = self.session.sql(f"SELECT * FROM {self.country_dim}").to_pandas() 
-
-    def calc_distance_km(origin_df, dest_df):
-        origin_lat = origin_df["LATITUDE"]
-        origin_lon = origin_df["LONGITUDE"]
-        dest_lat = dest_df["LATITUDE"]
-        dest_lon = dest_df["LONGITUDE"]
+        
+        self.mode_dim = self.session.sql(f"SELECT * FROM {self.mode_dim_table}").to_pandas()
+        self.country_dim = self.session.sql(f"SELECT * FROM {self.country_dim_table}").to_pandas() 
+        self.fct_fuel_price = self.session.sql(f"SELECT * FROM {self.fct_fuel_price_table}").to_pandas() 
+        self.fct_risk = self.session.sql(f"SELECT * FROM {self.fct_risk_table}").to_pandas() 
+        
+        
+        
+    @staticmethod
+    def calc_distance_km(lat1, lon1, lat2, lon2):
+        # @staticmethod : doesn't need self in args. just a calculation
+        R = 6371.0 # 地球の半径 (km)
         dLat = math.radians(lat2 - lat1)
         dLon = math.radians(lon2 - lon1)
         
@@ -26,10 +33,91 @@ class Analytics_data:
             math.cos(math.radians(lat2)) * math.sin(dLon / 2) ** 2
         
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        
-        distance_km = R * c
-        return distance_km
+        return R * c
 
+    def get_past_data(self, range_val, call_from = None):
+        
+        self.fact_logs_table = "KAGGLE_LOGISTICS.DEV_INTERMEDIATE.INT__FCT_LOGS_RAW"
+        self.fact_logs = self.session.sql(
+            f"""
+                SELECT 
+                    f.* FROM {self.fact_logs_table} f
+                CROSS JOIN (
+                    SELECT MAX(DATE) AS MAX_DATE FROM {self.fact_logs_table}
+                ) p
+                WHERE 
+                    f.DATE >= DATEADD(MONTH, -{range_val}, p.MAX_DATE)
+            """
+        ).to_pandas()
+        
+        transport_mode = ['air', 'sea', 'road', 'rail']
+        
+        bad_weather_uc_dt = {}
+        desrupt_uc_dt = {}
+        
+        for mode in transport_mode:
+            df = self.fact_logs[
+                (self.fact_logs['ORIGIN_BASE_POINT'] == st.session_state[f'{mode}_origin_base'])
+                &(self.fact_logs['DESTINATION_BASE_POINT'] == st.session_state[f'{mode}_dest_base'])
+                ]
+            bad_weather_uc_dt[mode] = df[df['WEATHER_CONDITION'] != 'Clear']['SHIPMENT_ID'].nunique()
+            desrupt_uc_dt[mode] = df[df['DISRUPTION_OCCURRED'] == 1]['SHIPMENT_ID'].nunique()
+            
+        result_df = pd.DataFrame({
+            'transport_mode': transport_mode,
+            'bad_weather_cnt': [bad_weather_uc_dt[mode] for mode in transport_mode],
+            'desrupt_cnt': [desrupt_uc_dt[mode] for mode in transport_mode]
+        })
+
+        if call_from == None:
+            return result_df
+        else: 
+            return df    
+
+    def get_port_coordinate(self):
+        mode_list = ['air', 'sea', 'road', 'rail']
+        ori_port_nm = {}
+        dest_port_nm = {}
+        ori_lat = {}
+        ori_lon = {}
+        dest_lat = {}
+        dest_lon = {}
+        color_rgb = {}
+        
+
+            
+        for mode in mode_list:                        
+            ori_cord_df = self.country_dim[self.country_dim['PORT_NAME_EN'] == st.session_state[f"{mode}_origin_port"]][["LATITUDE", "LONGITUDE"]]
+            dest_cord_df = self.country_dim[self.country_dim['PORT_NAME_EN'] == st.session_state[f"{mode}_dest_port"]][["LATITUDE", "LONGITUDE"]]
+
+            if mode == 'air':    
+                color_rgb[mode] = [30, 144, 255, 200]
+            elif mode == 'sea':  
+                color_rgb[mode] = [46, 139, 87, 200]
+            elif mode == 'road': 
+                color_rgb[mode] = [218, 165, 32, 200]
+            elif mode == 'rail': 
+                color_rgb[mode] = [138, 43, 226, 200]
+            
+            ori_port_nm[mode] = st.session_state[f"{mode}_origin_port"]
+            dest_port_nm[mode] = st.session_state[f"{mode}_dest_port"]
+            ori_lat[mode] = ori_cord_df['LATITUDE'].iloc[0]
+            ori_lon[mode] = ori_cord_df['LONGITUDE'].iloc[0]
+            dest_lat[mode] = dest_cord_df['LATITUDE'].iloc[0]
+            dest_lon[mode] = dest_cord_df['LONGITUDE'].iloc[0]
+
+        result_df = pd.DataFrame({
+            'origin_port_nm': ori_port_nm,
+            'dest_port_nm': dest_port_nm,
+            'origin_lat': ori_lat,
+            'origin_lon': ori_lon,
+            'dest_lat': dest_lat,
+            'dest_lon': dest_lon,
+            'color_rgb':color_rgb
+        })
+        return result_df 
+        
+        
     def get_cost_per_transport(self):        
         # create the data, 
         # grain : transport_mode(air, sea, road, rail), 
@@ -39,150 +127,119 @@ class Analytics_data:
             # L cost_factors : carbon_tax, air_minimum, air_cost_km_wt, other_cost_container
             # L prams: fuel_increase_param, risk_avoidance_param, weight_t
                 # L point : wt => calclate 1 container as 20t weight 
+        country_origin_name = {}
+        country_dest_name = {}
+        base_origin_name = {}
+        base_dest_name = {}
+        port_origin_name = {}
+        port_dest_name = {}
+        
+        weight = {}
+        num_of_container = {}
+        
+        fuel_increase_param = {}
+        risk_avoidance_param = {}
+        
+        cost_km_wt = {}
+        cost_minimum = {}
+        carbon_tax_t = {}
+        distance = {}
+        cost_container = {}
+
+        fuel_type = {}
+        fuel_l_t_km = {}
+        co2_emission = {}
         
         transport_mode_list = ['air', 'sea', 'road', 'rail']
-
-        country_origin_name = st.session_state['origin_country']
-        country_destination_name = st.session_state['destination_country']
-        
-        air_base_origin_name = st.session_state['air_origin_base']
-        sea_base_origin_name = st.session_state['sea_origin_base']
-        road_base_origin_name = st.session_state['road_origin_base']
-        rail_base_origin_name = st.session_state['rail_origin_base']
-        
-        air_base_dest_name = st.session_state['air_dest_base']
-        sea_base_dest_name = st.session_state['sea_dest_base']
-        road_base_dest_name = st.session_state['road_dest_base']
-        rail_base_dest_name = st.session_state['rail_dest_base']        
-
-        air_port_origin_name = st.session_state['air_origin_port']
-        sea_port_origin_name = st.session_state['sea_origin_port']
-        road_port_origin_name = st.session_state['road_origin_port']
-        rail_port_origin_name = st.session_state['rail_origin_port']
-        
-        air_port_dest_name = st.session_state['air_dest_port']
-        sea_port_dest_name = st.session_state['sea_dest_port']
-        road_port_dest_name = st.session_state['road_dest_port']
-        rail_port_dest_name = st.session_state['rail_dest_port']        
-        
-        weight = st.session_state['weight_t']
-        num_of_container = weight // 20 
-        fuel_increase_param = st.session_state['fuel_increase_param']
-        risk_avoidance_param = st.session_state['risk_avoidance_param']
-
-        air_fuel_type = st.session_state['air_fuel_type']
-        sea_fuel_type = st.session_state['sea_fuel_type']
-        road_fuel_type = st.session_state['road_fuel_type']
-        rail_fuel_type = st.session_state['rail_fuel_type']
-        
-        air_distance = None
-        sea_distance = None
-        road_distance = None
-        rail_distance = None
-
-        air_cost_km_wt = None 
-        air_cost_minimum = None
-        sea_cost_container = None
-        road_cost_container = None
-        rail_costr_container = None
-
-        air_carbon_tax_t = None
-        sea_carbon_tax_t = None
-        road_carbon_tax_t = None
-        rail_carbon_tax_t = None
-
-        air_fuel_l_t_km = None
-        sea_fuel_l_t_km = None
-        road_fuel_l_t_km = None
-        rail_fuel_l_t_km = None
-
-        air_co2_emission = None
-        sea_co2_emission = None
-        road_co2_emission = None
-        rail_co2_emission = None
-
-        for i in transport_mode_list:
-            origin = (
-                self.country_dim[self.country_dim['PORT_NAME_EN'] == st.session_state[f'{i}_origin_port']]
+        for mode in transport_mode_list:
+            country_origin_name[mode] = st.session_state['origin_country']
+            country_dest_name[mode] = st.session_state['destination_country']
+            base_origin_name[mode] = st.session_state[f'{mode}_origin_base']
+            base_dest_name[mode] = st.session_state[f'{mode}_dest_base']
+            port_origin_name[mode] = st.session_state[f'{mode}_origin_port']
+            port_dest_name[mode] = st.session_state[f'{mode}_dest_port']
+            fuel_increase_param[mode] = st.session_state.get('fuel_increase_param', 1.0)
+            risk_avoidance_param[mode] = st.session_state.get('risk_avoidance_param', 1.0)
+            
+            weight[mode] = st.session_state.get('weight_t', 20.0)
+            num_of_container[mode] = max(1.0, weight[mode] // 20)
+            
+            origin_country_dim = (
+                self.country_dim[self.country_dim['PORT_NAME_EN'] == st.session_state[f'{mode}_origin_port']]
                 [["LATITUDE", "LONGITUDE", "COST_PER_KM_WT", "COST_PER_CONTAINER", "MINIMUM_CHARGE", "CARBON_TAX_PER_T_CO2"]]
             )
-            dest = (
-                self.country_dim[self.country_dim['PORT_NAME_EN'] == st.session_state[f'{i}_dest_port']]
+            dest_country_dim = (
+                self.country_dim[self.country_dim['PORT_NAME_EN'] == st.session_state[f'{mode}_dest_port']]
                 [["LATITUDE", "LONGITUDE", "COST_PER_KM_WT", "COST_PER_CONTAINER", "MINIMUM_CHARGE", "CARBON_TAX_PER_T_CO2"]]
             )
+            
+            cost_km_wt[mode] = dest_country_dim['COST_PER_KM_WT'].iloc[0]
+            cost_minimum[mode] = dest_country_dim['MINIMUM_CHARGE'].iloc[0]
+            cost_container[mode] = dest_country_dim['COST_PER_CONTAINER'].iloc[0]
+            carbon_tax_t[mode] = dest_country_dim['CARBON_TAX_PER_T_CO2'].iloc[0]
+            fuel_type[mode] = st.session_state[f'{mode}_fuel_type']
+            
+            lat1, lon1 = origin_country_dim["LATITUDE"].iloc[0], origin_country_dim['LONGITUDE'].iloc[0]
+            lat2, lon2 = dest_country_dim["LATITUDE"].iloc[0], dest_country_dim['LONGITUDE'].iloc[0]
+            distance[mode] = self.calc_distance_km(lat1, lon1, lat2, lon2)
 
-            if i == 'air':
-                air_cost_km_wt = dest['COST_PER_KM_WT']
-                air_cost_minimum = dest['MINIMUM_CHARGE']
-                air_carbon_tax_t = dest['CARBON_TAX_PER_T_CO2']
-                air_distance = calc_distance_km(air_origin, air_dest)
-            elif i == 'sea':
-                sea_cost_container = dest['COST_PER_CONTAINER']
-                sea_carbon_tax_t = dest['CARBON_TAX_PER_T_CO2']
-                sea_distance = calc_distance_km(sea_origin, sea_dest)
-            elif i == 'road':
-                road_cost_container = dest['COST_PER_CONTAINER']
-                road_carbon_tax_t = dest['CARBON_TAX_PER_T_CO2']
-                road_distance = calc_distance_km(road_origin, road_dest)
-            elif i == 'rail':
-                rail_costr_container = dest['COST_PER_CONTAINER']
-                rail_carbon_tax_t = dest['CARBON_TAX_PER_T_CO2']
-                rail_distance = calc_distance_km(rail_origin, rail_dest)
-
-        # co2 emission per t,km
-        air_df = self.mode_dim[
-            (self.mode_dim["TRANSPORT_MODE"] == "AIR")
-            &(self.mode_dim["VEHICLE_TYPE"] == st.session_state["air_vehicle_type"])
-            &(self.mode_dim["AIR_DISTANCE"] == st.session_state["air_distance"])
-            &(self.mode_dim["FUEL_TYPE"]== st.session_state["air_fuel_type"])
-        ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
-        sea_df = self.mode_dim[
-            (self.mode_dim["TRANSPORT_MODE"] == "SEA")
-            &(self.mode_dim["VEHICLE_TYPE"] == st.session_state["sea_vehicle_type"])
-            &(self.mode_dim["SEA_SIZE"] == st.session_state['sea_size'])
-            &(self.mode_dim["FUEL_TYPE"]== st.session_state["sea_fuel_type"])
-        ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
-        road_df = self.mode_dim[
-            (self.mode_dim["TRANSPORT_MODE"] == "ROAD")
-            &(self.mode_dim["VEHICLE_TYPE"] == st.session_state['road_vehicle_type'])
-            &(self.mode_dim["FUEL_TYPE"] == st.session_state["road_fuel_type"])
-        ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
-        rail_df = self.mode_dim[
-            (self.mode_dim["TRANSPORT_MODE"] == "RAIL")
-            &(self.mode_dim["VEHICLE_TYPE"] == st.session_state['rail_vehicle_type'])
-            &(self.mode_dim["FUEL_TYPE"] == st.session_state['rail_fuel_type'])
-        ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
-        
-        air_co2_emission = air_df['WTW_CO2_G_T_KM']
-        air_fuel_l_t_km = air_df['FUEL_L_T_KM']
-        sea_co2_emission = sea_df['WTW_CO2_G_T_KM']
-        sea_fuel_l_t_km = sea_df['FUEL_L_T_KM']
-        road_co2_emission = road_df['WTW_CO2_G_T_KM']
-        road_fuel_l_t_km = road_df['FUEL_L_T_KM']
-        rail_co2_emission = rail_df['WTW_CO2_G_T_KM']
-        rail_fuel_l_t_km = rail_df['FUEL_L_T_KM']
+            if mode == 'air':
+                df = self.mode_dim[
+                    (self.mode_dim["TRANSPORT_MODE"] == "AIR")
+                    &(self.mode_dim["VEHICLE_TYPE"] == st.session_state["air_vehicle_type"])
+                    &(self.mode_dim["AIR_DISTANCE"] == st.session_state["air_distance"])
+                    &(self.mode_dim["FUEL_TYPE"]== st.session_state["air_fuel_type"])
+                    ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
+                fuel_l_t_km[mode] = df['FUEL_L_T_KM'].iloc[0]
+                co2_emission[mode] = df['WTW_CO2_G_T_KM'].iloc[0]
+                
+            elif mode == 'sea':
+                df = self.mode_dim[
+                    (self.mode_dim["TRANSPORT_MODE"] == "SEA")
+                    &(self.mode_dim["VEHICLE_TYPE"] == st.session_state["sea_vehicle_type"])
+                    &(self.mode_dim["SEA_SIZE"] == st.session_state['sea_size'])
+                    &(self.mode_dim["FUEL_TYPE"]== st.session_state["sea_fuel_type"])
+                     ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
+                fuel_l_t_km[mode] = df['FUEL_L_T_KM'].iloc[0]
+                co2_emission[mode] = df['WTW_CO2_G_T_KM'].iloc[0]
+            elif mode == 'road':
+                df = self.mode_dim[
+                    (self.mode_dim["TRANSPORT_MODE"] == "ROAD")
+                    &(self.mode_dim["VEHICLE_TYPE"] == st.session_state['road_vehicle_type'])
+                    &(self.mode_dim["FUEL_TYPE"] == st.session_state["road_fuel_type"])
+                    ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
+                fuel_l_t_km[mode] = df['FUEL_L_T_KM'].iloc[0]
+                co2_emission[mode] = df['WTW_CO2_G_T_KM'].iloc[0]
+            elif mode == 'rail':
+                df = self.mode_dim[
+                    (self.mode_dim["TRANSPORT_MODE"] == "RAIL")
+                    &(self.mode_dim["VEHICLE_TYPE"] == st.session_state['rail_vehicle_type'])
+                    &(self.mode_dim["FUEL_TYPE"] == st.session_state['rail_fuel_type'])
+                    ][["WTW_CO2_G_T_KM", "FUEL_L_T_KM"]]
+                fuel_l_t_km[mode] = df['FUEL_L_T_KM'].iloc[0]
+                co2_emission[mode] = df['WTW_CO2_G_T_KM'].iloc[0]
         
         merged_df = pd.DataFrame(
             {
-                "transport_mode": ['air', 'sea', 'road', 'rail'],
-                "country_origin_name": [country_origin_name] * 4,
-                "country_destination_name":[country_destination_name] * 4,
-                "base_origin_name":[air_base_origin_name, sea_base_origin_name, road_base_origin_name, rail_base_origin_name],
-                "base_dest_name":[air_base_dest_name, sea_base_dest_name, road_base_dest_name, rail_base_dest_name],
-                "port_origin_name":[air_port_origin_name, sea_port_origin_name, road_port_origin_name, rail_port_origin_name],
-                "port_dest_name":[air_port_dest_name, sea_port_dest_name, road_port_dest_name, rail_port_dest_name],
-                "weight":[weight]*4,
-                "num_of_container": [num_of_container]*4,
-                "fuel_increase_param": [fuel_increase_param]*4,
-                "risk_avoidance_param":[risk_avoidance_param]*4,
-                "distance":[air_distance, sea_distance, road_distance, rail_distance],
-                "air_cost_km_wt": [air_cost_km_wt, 0, 0, 0],
-                "air_cost_minimum":[air_cost_minimum, 0, 0, 0],
-                "cost_container":[0, sea_cost_container, road_cost_container, rail_costr_container],
-                "carbon_tax_t": [air_carbon_tax_t, sea_carbon_tax_t, road_carbon_tax_t, road_carbon_tax_t, rail_carbon_tax_t],
-                "fuel_l_t_km":[air_fuel_l_t_km, sea_fuel_l_t_km, road_fuel_l_t_km, rail_fuel_l_t_km],
-                "fuel_type":[air_fuel_type, sea_fuel_type, road_fuel_type, rail_fuel_type],
-                "air_co2_emission_g_t_km":[air_co2_emission, sea_co2_emission, road_co2_emission, rail_co2_emission]
+                "transport_mode": transport_mode_list,
+                "country_origin_name": [country_origin_name[mode] for mode in transport_mode_list],
+                "country_destination_name":[country_dest_name[mode] for mode in transport_mode_list],
+                "base_origin_name":[base_origin_name[mode] for mode in transport_mode_list],
+                "base_dest_name":[base_dest_name[mode] for mode in transport_mode_list],
+                "port_origin_name":[port_origin_name[mode] for mode in transport_mode_list],
+                "port_dest_name":[port_dest_name[mode] for mode in transport_mode_list],
+                "weight":[weight[mode] for mode in transport_mode_list],
+                "num_of_container": [num_of_container[mode] for mode in transport_mode_list],
+                "fuel_increase_param": [fuel_increase_param[mode] for mode in transport_mode_list],
+                "risk_avoidance_param":[risk_avoidance_param[mode] for mode in transport_mode_list],
+                "distance":[distance[mode] for mode in transport_mode_list],
+                "air_cost_km_wt": [cost_km_wt[mode] for mode in transport_mode_list],
+                "air_cost_minimum":[cost_minimum[mode] for mode in transport_mode_list],
+                "cost_container":[cost_container[mode] for mode in transport_mode_list],
+                "carbon_tax_t": [carbon_tax_t[mode] for mode in transport_mode_list],
+                "fuel_l_t_km":[fuel_l_t_km[mode] for mode in transport_mode_list],
+                "fuel_type":[fuel_type[mode] for mode in transport_mode_list],
+                "co2_emission_g_t_km":[co2_emission[mode] for mode in transport_mode_list]
             }
         )
 
@@ -193,13 +250,32 @@ class Analytics_data:
             else: 
                 return row['cost_container'] * row['num_of_container']
 
-        merged_df['cost_port_fee'] = df.apply(calculate_total_cost, axis=1)
+        merged_df['cost_port_fee'] = merged_df.apply(calculate_total_cost, axis=1)
 
         # carbon tax
         merged_df['cost_carbon_tax'] = (
-            (((merged_df['air_co2_emission_g_t_km'] * merged_df['weight'] * merged_df['distance'])/1_000_000) 
+            (((merged_df['co2_emission_g_t_km'] * merged_df['weight'] * merged_df['distance'])/1_000_000) 
             * merged_df['carbon_tax_t'])
         )
-        # TODO : 
-        # fuel Fee : later, needs fact df
-        # policitcal risk, desruption risk
+        # LEFT JOIN Fuel market price
+        merged_df = pd.merge(merged_df, self.fct_fuel_price, how = 'left', left_on = 'fuel_type', right_on = 'FUEL_TYPE')
+        merged_df['cost_fuel_price'] = (
+                ((merged_df['distance'] * merged_df['weight']) * merged_df['fuel_l_t_km'])
+                * merged_df['FUEL_PRICE_USD_PER_L'] 
+                * merged_df['fuel_increase_param']
+        )
+        # LEFT JOIN risk factors
+        merged_df['tmp_mode'] = merged_df['transport_mode'].str.upper()
+        merged_df = pd.merge(
+            merged_df, self.fct_risk, 
+            how='left', 
+            left_on = ['base_dest_name', 'tmp_mode'],
+            right_on = ['DESTINATION_BASE_POINT', 'TRANSPORT_MODE']
+        )
+        merged_df['cost_risk'] = (
+            merged_df['cost_carbon_tax'] * (1 + merged_df['risk_avoidance_param'] * merged_df['DISRUPTION_RATE'])
+        )
+        merged_df['cost_total'] = (
+            merged_df['cost_fuel_price'] + merged_df['cost_risk'] + merged_df['cost_port_fee']
+        )
+        return merged_df 

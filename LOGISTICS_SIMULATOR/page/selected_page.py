@@ -6,8 +6,6 @@ from page.monitor import monitor
 def selected_page():
     if st.session_state['current_page'] == 'setup':
         setup() 
-    elif st.session_state['current_page'] == 'home_page':
-        home_page() 
     elif st.session_state['current_page'] == 'analytics':
         analytics()
     elif st.session_state['current_page'] == 'monitor':

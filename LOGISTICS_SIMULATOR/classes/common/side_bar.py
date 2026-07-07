@@ -2,14 +2,13 @@ import streamlit as st
 class Side_bar:
     def __init__(self):
         session_state_key_dict = {
-            "current_page": "home_page"
+            "current_page": "analytics"
         }
         for key, val in session_state_key_dict.items():
             if key not in st.session_state:
                 st.session_state[key] = val 
 
         self.page_map = {
-                    "home_page": "🏠HOME",
                     "analytics": "📊ANALYTICS",
                     "monitor": "💰MONITOR",
                     "setup": "⚙️SETUP"

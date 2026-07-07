@@ -5,11 +5,21 @@ class Analytics_state:
             'fuel_increase_param':1.0,
             'risk_avoidance_param':1.0,
             'weight_t':20,
-            'setup_check_flg': False
+            'setup_check_flg': False,
+            'selected_detail': None,
+            'past_date_range' : 3,
+            'selected_detail': None
         }
         for key, val in analytics_param_dict.items():
             if key not in st.session_state:
                 st.session_state[key] = val 
+
+        self.past_date_range_dict = {
+            3 : "3month",
+            6 : "6month",
+            12 : "1year",
+            36 : "3year"
+        }
 
     def setup_check(self):
         setup_param_keys = [
@@ -51,7 +61,7 @@ class Analytics_state:
             if i in st.session_state:
                 index += 1 
         if index == len(setup_param_keys):
-            self.setup_check_flg = True
+            st.session_state['setup_check_flg'] = True
             
     def load_value(self, key_name):
         widget_key = '_' + key_name
