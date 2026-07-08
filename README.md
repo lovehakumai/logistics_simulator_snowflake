@@ -54,25 +54,7 @@ Setup country, base point, port and each vehicle attribution here. You cannot se
 ![Monitor](asset/8.png)
 
 ---
-## System Architecture Diagram
-※The tables and views are transformed by dbt workflow
 
-```mermaid
-graph TD
-    A[Kaggle / Compressed Zip] -->|Manual Stage Allocation| B(Snowflake Internal Stage)
-    B -->|Encrypted File Stream Access| C[Snowpark Python Engine]
-    C -->|In-Memory Chunked Streaming| D[Snowflake Compute Pushdown]
-    D -->|High-Throughput Bulk Insertion| E[(Snowflake Database: RAW Layer)]
-    
-    subgraph GitHub Actions Pipeline
-        F[GitHub CI Runner] -->|Asymmetric RSA-2048 Key-Pair Handshake| D
-    end
-
-    style B fill:#333,stroke:#29B6F6,stroke-width:2px;
-    style D fill:#1A237E,stroke:#29B6F6,stroke-width:2px;
-    style E fill:#0D47A1,stroke:#FFF,stroke-width:2px;
-```
----
 ## Core Engineering Highlights
 ### FinOps / st.form, st.session_state , 
 
