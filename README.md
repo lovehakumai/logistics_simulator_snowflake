@@ -19,7 +19,9 @@ The Most efficient Transport
 On the top, shows the origin country and destination country and form section to setup the cost factor parameters fuel_increase_param, risk_avoidance_paramm weight. 
 
 ![Analytics Page](asset/1.png)  
+
 ![Total Cost](asset/2.png)  
+
 Showing the total_cost of each transport mode above.
 
 These are The detail of each cost which is used in total_cost calculation and changed by setting up the params on the top.  
@@ -28,8 +30,10 @@ These are The detail of each cost which is used in total_cost calculation and ch
 #### Past metrics
 Showing the 2 metrics [BadWeather], [Desrupt] to check the actual past history.
 Detail chart will be shown by clicking 🔍Show Detail . The metrics and chart is calculated by the daterange setted up above.  
-※Each metrics is aggregated with the base point grain level.    
+※Each metrics is aggregated with the base point grain level. 
+
 ![Past Metrics](asset/4.png)  
+
 ![Past Metrics](asset/5.png)  
 
 #### Global Route Visualization  
@@ -41,7 +45,8 @@ To Show the origin and destination port place.
 #### Monitor
 Showing the consumed credits in this Streamlit app. The data is from INFORMATION_SCHEMA and this view doesn’t have specific columns of credit so that I calculated it based WAREHOUSE TYPE and usage time.  
 
-You can get the collect credit information from ACCOUNT_USAGE but the data synchronize needs 1hour to 1 day. ※INFORMATION_SCHEMA remains only for 7days so this view only have the consumed credit in latest 7 days.
+You can get the collect credit information from ACCOUNT_USAGE but the data synchronize needs 1hour to 1 day. ※INFORMATION_SCHEMA remains only for 7days so this view only have the consumed credit in latest 7 days.  
+
 ![Monitor](asset/7.png)
 
 ### SETUP PAGE
