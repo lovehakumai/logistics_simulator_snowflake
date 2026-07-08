@@ -24,7 +24,7 @@ class Monitor:
                     WHEN 'Medium'  THEN 4
                     WHEN 'Large'   THEN 8
                     END AS total_credit
-            FROM TABLE(KAGGLE_LOGISTICS.INFORMATION_SCHEMA.QUERY_HISTORY(RESULT_LIMIT => 10000)) 
+            FROM TABLE(KAGGLE_LOGISTICS.INFORMATION_SCHEMA.QUERY_HISTORY(RESULT_LIMIT => 5000)) 
             WHERE 
             (QUERY_TAG = 'logistics_simulator' AND QUERY_TEXT NOT LIKE '%INFORMATION_SCHEMA.QUERY_HISTORY%')
             OR (
